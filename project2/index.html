@@ -1,1 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Project 2: Image Homography and Warping</title>
+
+  <style>
+    :root {
+      --maxw: 980px;
+      --gap: 1rem;
+      --accent: #2563eb; /* soft blue accent */
+      --bg: #f9fafc;
+    }
+
+    /* Base */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      line-height: 1.6;
+      color: #111;
+      background: var(--bg);
+    }
+    main { max-width: var(--maxw); margin: 0 auto; padding: 2rem 1rem 3rem; }
+
+    h1, h2, h3 {
+      line-height: 1.25;
+      margin: 1.2rem 0 0.6rem;
+      font-weight: 650;
+    }
+    h1.page-title {
+      text-align: center;
+      color: var(--accent);
+      font-size: 1.9rem;
+      margin-top: 1rem;
+      letter-spacing: 0.3px;
+      position: relative;
+    }
+    h1.page-title::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -6px;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 3px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), #60a5fa);
+    }
+
+    p { margin: 0.7rem 0; color: #222; }
+    ul, ol { margin: 0.5rem 0 0.8rem; padding-left: 1.15rem; }
+    code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.95rem; }
+    hr { border: 0; border-top: 1px solid #e5e7eb; margin: 2rem 0; }
+
+    /* Header + Nav */
+    header.top {
+      border-bottom: 1px solid #e5e7eb;
+      background: #ffffffcc;
+      backdrop-filter: blur(6px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .top-inner {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0.7rem 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    nav.tabs {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    nav.tabs a {
+      display: inline-block;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.95rem;
+      text-decoration: none;
+      color: #333;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #fff;
+      transition: all 0.25s ease;
+    }
+    nav.tabs a:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    /* Cards / media blocks */
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 0.75rem;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    figure { margin: 0; }
+    figcaption { font-size: 0.93rem; color: #555; margin-top: 0.45rem; }
+    img { display: block; width: 100%; height: auto; border-radius: 6px; }
+
+    /* Layout helpers */
+    .figure-pair,
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--gap);
+      align-items: start;
+      margin: 1.25rem 0 2rem;
+    }
+    .single { margin: 1rem 0 1.5rem; }
+    .note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 0.75rem 0.9rem;
+      border-radius: 8px;
+    }
+    table { width: 100%; border-collapse: collapse; background: #fff; }
+    th, td { border: 1px solid #e5e7eb; padding: 0.65rem; vertical-align: top; }
+    th { text-align: left; background: #f8fafc; }
+
+    /* Section anchors spacing (for sticky nav) */
+    section[id] { scroll-margin-top: 74px; }
+
+    /* Responsive */
+    @media (max-width: 800px) {
+      .figure-pair, .pair { grid-template-columns: 1fr; }
+      nav.tabs a { font-size: 0.95rem; }
+    }
+  </style>
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(','\\)'], ['$', '$']], displayMath: [['\\[','\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+<body>
+
+  <!-- Top navigation -->
+  <header class="top">
+    <div class="top-inner">
+      <nav class="tabs" aria-label="Sections">
+        <a href="#part1">Part 1</a>
+        <a href="#part2">Part 2</a>
+        <a href="#part3">Part 3</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1 class="page-title">Project 2: Image Homography and Warping</h1>
+
+
+    <!-- ===================== PART 1 ===================== -->
+    <section id="part1" aria-labelledby="p1-title">
+      <h1 id="p1-title">Part 1: Image Homography Estimation and Rectification</h1>
+
+      <section id="objective">
+        <h2>Objective</h2>
+        <p>
+          The aim of this experiment is to implement <strong>homography estimation</strong> and
+          <strong>image warping</strong> in order to rectify an image of a planar surface that was captured at an angle.
+          After rectification, the tilted region should appear as if it was viewed directly from the front (fronto-parallel view).
+        </p>
+      </section>
+
+      <section id="procedure">
+        <h2>Procedure and Explanation</h2>
+
+        <h3>1. Manual Point Selection</h3>
+        <p>For each image, four corner points corresponding to the same planar surface were selected manually. The points were chosen in the order:</p>
+        <p class="note">\( \text{Top-Left} \rightarrow \text{Top-Right} \rightarrow \text{Bottom-Right} \rightarrow \text{Bottom-Left}. \)</p>
+        <p>
+          Each selected corner was labeled as P1, P2, P3, and P4 on the original image.
+          Accurate point selection is important because even small deviations can cause noticeable distortion in the final rectified output.
+        </p>
+
+        <h3>2. Estimating the Homography Matrix</h3>
+        <p>
+          A homography defines the relationship between two planes under perspective projection.
+          Using the manually selected point correspondences, the \( 3\times3 \) homography matrix \( H \) was computed using the
+          <strong>Direct Linear Transformation (DLT)</strong> algorithm. The mathematical relationship is:
+        </p>
+        <p class="note">
+          \[
+          \lambda
+          \begin{bmatrix}
+          u \\ v \\ 1
+          \end{bmatrix}
+          =
+          H
+          \begin{bmatrix}
+          x \\ y \\ 1
+          \end{bmatrix},
+          \]
+        </p>
+        <p>
+          where \( (x, y) \) are coordinates in the original image and \( (u, v) \) are coordinates in the rectified image.
+          Normalization was performed before solving using Singular Value Decomposition (SVD) to improve numerical stability.
+        </p>
+
+        <h3>3. Image Warping and Rectification</h3>
+        <p>
+          After obtaining the homography matrix \( H \), inverse mapping was used to warp the original image.
+          This process maps every pixel in the rectified image back to the original image using \( H^{-1} \):
+        </p>
+        <p class="note">\[(x, y, 1)^T = H^{-1}(u, v, 1)^T.\]</p>
+        <p>
+          Bilinear interpolation was applied for smooth intensity transitions. The output width and height were manually chosen
+          to ensure that the planar region appeared with correct proportions. The result is a fronto-parallel view, removing perspective distortion.
+        </p>
+
+        <h3>4. Visualization of Results</h3>
+        <ul>
+          <li>The <strong>original image</strong> with manually selected corner points labeled (P1–P4)</li>
+          <li>The <strong>rectified image</strong> showing the corrected, fronto-parallel region</li>
+        </ul>
+      </section>
+
+      <section id="results">
+        <h2>Results and Analysis</h2>
+        <p>Each pair shows the original image (with selected points) on the left and the rectified output on the right.</p>
+
+        <!-- Image 1 -->
+        <div class="figure-pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/original_image_1.jpg" alt="Original Image 1 with selected points (P1–P4)" />
+              <figcaption>Original image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified_image_1.jpg" alt="Rectified Image 1 (fronto-parallel)" />
+              <figcaption>Rectified (fronto-parallel) output</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="figure-pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/original_image_2.jpg" alt="Original Image 2 with selected points (P1–P4)" />
+              <figcaption>Original image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified_image_2.jpg" alt="Rectified Image 2 (fronto-parallel)" />
+              <figcaption>Rectified (fronto-parallel) output</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <!-- Image 3 -->
+        <div class="figure-pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/original_image_3.jpg" alt="Original Image 3 with selected points (P1–P4)" />
+              <figcaption>Original image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified_image_3.jpg" alt="Rectified Image 3 (fronto-parallel)" />
+              <figcaption>Rectified (fronto-parallel) output</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <!-- Image 4 -->
+        <div class="figure-pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/original_image_4.jpg" alt="Original Image 4 with selected points (P1–P4)" />
+              <figcaption>Original image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified_image_4.jpg" alt="Rectified Image 4 (fronto-parallel)" />
+              <figcaption>Rectified (fronto-parallel) output</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <!-- Image 5 -->
+        <div class="figure-pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/original_image_5.jpg" alt="Original Image 5 with selected points (P1–P4)" />
+              <figcaption>Original image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified_image_5.jpg" alt="Rectified Image 5 (fronto-parallel)" />
+              <figcaption>Rectified (fronto-parallel) output</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section id="discussion">
+        <h2>Brief Discussion: How Homography Enables Rectification</h2>
+        <p>Homography plays an important role in correcting perspective distortion in images. With four corner points and a computed homography matrix, the tilted plane maps to a rectangular region, producing a fronto-parallel view.</p>
+        <hr />
+        <ul>
+          <li>Straight edges remain straight in the rectified image.</li>
+          <li>Geometric shape becomes regular and front-facing.</li>
+          <li>Minor blur/stretch can occur due to interpolation.</li>
+          <li>Accurate corner selection is crucial.</li>
+        </ul>
+      </section>
+    </section>
+
+    <!-- ===================== PART 2 ===================== -->
+    <section id="part2" aria-labelledby="p2-title">
+      <h1 id="p2-title">Part 2: Creative Applications of Homography</h1>
+
+      <p>
+        This part extends Part 1 to two applications:
+        <strong>Document Scanning</strong> (rectify + threshold) and
+        <strong>Augmented Reality (AR) Effect</strong> (insert texture on a planar surface).
+      </p>
+
+      <hr />
+
+      <section id="document-scanning">
+        <h2>1. Document Scanning</h2>
+        <h3>Methodology</h3>
+        <ul>
+          <li>Select TL, TR, BR, BL on the document boundary.</li>
+          <li>Compute homography (Normalized DLT) → rectangle.</li>
+          <li>Warp via <code>cv2.warpPerspective()</code>.</li>
+          <li>Apply adaptive thresholding for a “scanned” look.</li>
+        </ul>
+
+        <h3>Results</h3>
+        <div class="pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/points.jpg" alt="Input with selected points on document" />
+              <figcaption>Input with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/rectified.jpg" alt="Rectified document view" />
+              <figcaption>Rectified view</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="single">
+          <div class="card">
+            <figure>
+              <img src="all%20images/scanned_binary.png" alt="Binary scanned-like output of the rectified document" />
+              <figcaption>Scanned binary output</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <p class="note">Rectification removes perspective distortion; the binary step yields a crisp, print-like appearance.</p>
+      </section>
+
+      <hr />
+
+      <section id="ar">
+        <h2>2. AR Texture Insertion (Augmented Reality Effect)</h2>
+        <h3>Methodology</h3>
+        <ul>
+          <li>Load base scene and texture.</li>
+          <li>Click four target-plane corners.</li>
+          <li>Estimate homography (texture → plane).</li>
+          <li>Warp and composite into base, clipped to region.</li>
+        </ul>
+
+        <h3>Results</h3>
+        <div class="pair">
+          <div class="card">
+            <figure>
+              <img src="all%20images/points%20original.jpg" alt="Base image with selected target points for AR insertion" />
+              <figcaption>Base image with selected points</figcaption>
+            </figure>
+          </div>
+          <div class="card">
+            <figure>
+              <img src="all%20images/ar%20composite.jpg" alt="AR composite result with projected texture" />
+              <figcaption>AR composite result</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="single">
+          <div class="card">
+            <figure>
+              <img src="all%20images/panel%20base%20vs%20ar.jpg" alt="Side-by-side comparison of base vs AR result" />
+              <figcaption>Side-by-side panel comparison</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <p class="note">The projected logo aligns with surface perspective; accurate corner order is essential.</p>
+      </section>
+
+      <hr />
+
+      <section id="observations">
+        <h2>Observations and Conclusion</h2>
+        <ul>
+          <li>Same pipeline generalizes to scanning and AR.</li>
+          <li>Point selection accuracy is the main error source.</li>
+          <li>Avoid extreme angles; preserve aspect ratios for best AR quality.</li>
+        </ul>
+        <p>
+          A 3×3 homography encapsulates perspective geometry, enabling practical rectification and artistic AR overlays.
+        </p>
+      </section>
+    </section>
+
+    <!-- ===================== PART 3 ===================== -->
+    <section id="part3" aria-labelledby="p3-title">
+      <h1 id="p3-title">Part 3: Warping Comparison — Triangular Mesh vs Thin-Plate Spline (TPS)</h1>
+
+      <section id="objective-p3">
+        <h2>Objective</h2>
+        <p>
+          Compare <strong>Triangular Mesh (Piecewise Affine)</strong> vs <strong>Thin-Plate Spline (TPS)</strong> by warping digit images of the same class and assessing smoothness, continuity, and behavior.
+        </p>
+      </section>
+
+      <section id="method-p3">
+        <h2>Methodology and Implementation Steps</h2>
+        <ul>
+          <li>Digits: <code>3-a → 3-b</code> and <code>7-a → 7-b</code>.</li>
+          <li><code>scikit-image</code> transforms: <code>PiecewiseAffineTransform</code> and <code>ThinPlateSplineTransform</code>.</li>
+          <li>12–16 manual correspondences + 8 auto boundary points.</li>
+          <li>Warp source to target with both methods; compare.</li>
+        </ul>
+      </section>
+
+      <hr />
+
+      <section id="digit-3">
+        <h2>Results for Digit 3</h2>
+        <div class="single card">
+          <figure>
+            <img src="all%20images/comparison_side_by_side.jpg" alt="Digit 3: Source, Mesh warp, TPS warp, Target (side-by-side)" />
+            <figcaption>Source (3-a), Mesh warp, TPS warp, Target (3-b).</figcaption>
+          </figure>
+        </div>
+
+        <div class="single card">
+          <figure>
+            <img src="all%20images/target_points_labeled.png" alt="Digit 3 target points labeled" />
+            <figcaption>Target points labeled for Digit 3.</figcaption>
+          </figure>
+        </div>
+
+        <div class="single card">
+          <figure>
+            <img src="all%20images/target_mesh.png" alt="Digit 3 target triangular mesh overlay" />
+            <figcaption>Target triangular mesh overlay for Digit 3.</figcaption>
+          </figure>
+        </div>
+
+        <h3>Observation</h3>
+        <p>
+          Mesh aligns well but shows angular transitions at curves; TPS is smoother and preserves curvature continuity. Mesh is faster; TPS incurs global solve cost.
+        </p>
+      </section>
+
+      <hr />
+
+      <section id="digit-7">
+        <h2>Results for Digit 7</h2>
+        <div class="single card">
+          <figure>
+            <img src="all%20images/comparison_side_by_side_7.jpg" alt="Digit 7: Source, Mesh warp, TPS warp, Target (side-by-side)" />
+            <figcaption>Source (7-a), Mesh warp, TPS warp, Target (7-b).</figcaption>
+          </figure>
+        </div>
+
+        <div class="single card">
+          <figure>
+            <img src="all%20images/target_points_labeled_7.png" alt="Digit 7 target points labeled" />
+            <figcaption>Target points labeled for Digit 7.</figcaption>
+          </figure>
+        </div>
+
+        <div class="single card">
+          <figure>
+            <img src="all%20images/target_mesh_7.png" alt="Digit 7 target triangular mesh overlay" />
+            <figcaption>Target triangular mesh overlay for Digit 7.</figcaption>
+          </figure>
+        </div>
+
+        <h3>Observation</h3>
+        <p>
+          Mesh yields a sharper, segmented look along the diagonal; TPS bends smoothly at the corner and keeps a continuous slope. Differences are subtler than in “3”.
+        </p>
+      </section>
+
+      <hr />
+
+      <section id="table">
+        <h2>Comparison Summary</h2>
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Aspect</th>
+                <th>Triangular Mesh</th>
+                <th>Thin-Plate Spline (TPS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Type</strong></td><td>Local per-triangle affine</td><td>Global smooth, min. bending energy</td></tr>
+              <tr><td><strong>Continuity</strong></td><td>Possible seams at triangle edges</td><td>Globally continuous</td></tr>
+              <tr><td><strong>Smoothness</strong></td><td>Piecewise-linear</td><td>Smooth curved transitions</td></tr>
+              <tr><td><strong>Control</strong></td><td>Local influence</td><td>Global influence</td></tr>
+              <tr><td><strong>Cost</strong></td><td>Faster</td><td>Slightly slower</td></tr>
+              <tr><td><strong>Digit 3</strong></td><td>Angular breaks near loops</td><td>Smoother outline, natural curvature</td></tr>
+              <tr><td><strong>Digit 7</strong></td><td>Straight segments preserved</td><td>Smoother corner bending</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="discussion-p3">
+        <h2>Analysis and Discussion</h2>
+        <p>
+          Mesh is strong for fast, local edits but can introduce seams on curves. TPS minimizes bending energy and delivers globally smooth, natural deformations—especially beneficial for curved shapes like “3”.
+        </p>
+      </section>
+    </section>
+  </main>
+</body>
+</html>
 
