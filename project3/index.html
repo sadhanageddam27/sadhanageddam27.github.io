@@ -1,1 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Part 1: Lightweight Object Detection using SSD</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem;
+      max-width: 900px;
+      line-height: 1.5;
+      color: #222;
+      background-color: #fafafa;
+    }
+
+    /* ---- NEW: Navbar styling ---- */
+    nav {
+      position: sticky;
+      top: 0;
+      background-color: #fafafa;
+      padding: 0.6rem 0;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #ddd;
+      z-index: 1000;
+    }
+
+    nav a {
+      margin-right: 1rem;
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+    /* ---- end navbar styling ---- */
+
+    h1, h2 {
+      font-weight: 600;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 0.3rem;
+    }
+
+    .author,
+    .date {
+      text-align: center;
+      margin: 0;
+    }
+
+    p {
+      margin: 0.4rem 0;
+    }
+
+    ul {
+      margin: 0.4rem 0 0.4rem 1.5rem;
+    }
+
+    li {
+      margin: 0.15rem 0;
+    }
+
+    .figure {
+      text-align: center;
+      margin: 1.2rem auto;
+    }
+
+    .figure img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      border-radius: 4px;
+    }
+
+    .caption {
+      font-size: 0.9rem;
+      color: #555;
+      margin-top: 0.4rem;
+    }
+
+    .bold {
+      font-weight: bold;
+    }
+
+    .red {
+      color: red;
+    }
+
+    .green {
+      color: green;
+    }
+
+    .section-title {
+      margin-top: 1.5rem;
+    }
+
+    /* Optional: make sure scroll to anchors leaves a bit of space below nav */
+    h1[id], h2[id] {
+      scroll-margin-top: 4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NEW: Navbar -->
+  <nav>
+    <a href="#part1">Part 1: SSD</a>
+    <a href="#part2">Part 2: NMS</a>
+    <a href="#part3">Part 3: HOI (VLMs)</a>
+  </nav>
+
+  <!-- Add id="part1" so navbar can jump here -->
+  <h1 id="part1">Part 1: Lightweight Object Detection using SSD</h1>
+  <p class="author">Sadhana Geddam</p>
+  <p class="date"></p>
+
+  <h2 class="section-title">1. Introduction</h2>
+
+  <p>
+    Object detection aims to identify and localize objects in an image. Traditional detectors such as Faster R-CNN are accurate but computationally heavy. In this project, I implemented a <span class="bold">lightweight Single Shot Detector (SSD)</span> suitable for real-time use.
+  </p>
+
+  <p>
+    For training, I used the <span class="bold">banana detection dataset</span> from the Dive into Deep Learning book, containing 1000 training and 100 validation images, with bananas in different shapes, scales, and backgrounds.
+  </p>
+
+  <p>The goals of this part include:</p>
+  <ul>
+    <li>Building a lightweight SSD model from scratch.</li>
+    <li>Training it on the banana dataset.</li>
+    <li>Plotting and analyzing loss curves.</li>
+    <li>Visualizing detection results on validation images.</li>
+    <li>Using my own banana images to test generalization.</li>
+  </ul>
+
+  <h2 class="section-title">2. Model Architecture</h2>
+
+  <p>The SSD architecture includes:</p>
+  <ul>
+    <li>A lightweight convolutional backbone.</li>
+    <li>Two feature maps at different scales: 32 &times; 32 and 16 &times; 16.</li>
+    <li>Multi-scale anchors (8 per location).</li>
+    <li>Two heads:
+      <ul>
+        <li>Classification (background vs. banana)</li>
+        <li>Bounding box regression (encoded offsets)</li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>The loss function combines:</p>
+  <ul>
+    <li>Cross-entropy classification loss.</li>
+    <li>Smooth L1 bounding box regression loss.</li>
+    <li>Hard-negative mining with a 3:1 ratio.</li>
+  </ul>
+
+  <h2 class="section-title">3. Training Curves</h2>
+
+  <p>Training was performed for 20 epochs using Adam optimizer with a step learning-rate scheduler.</p>
+
+  <h3>3.1 Total Loss</h3>
+  <div class="figure">
+    <img src="training_total_loss.png" alt="Total loss (classification + bounding box) over 20 epochs." />
+    <div class="caption">Total loss (classification + bounding box) over 20 epochs.</div>
+  </div>
+
+  <h3>3.2 Classification Loss</h3>
+  <div class="figure">
+    <img src="training_class_loss.png" alt="Classification loss over 20 epochs." />
+    <div class="caption">Classification loss over 20 epochs.</div>
+  </div>
+
+  <h3>3.3 Bounding Box Loss</h3>
+  <div class="figure">
+    <img src="training_bbox_loss.png" alt="Bounding box regression loss over 20 epochs." />
+    <div class="caption">Bounding box regression loss over 20 epochs.</div>
+  </div>
+
+  <p class="bold">Observations:</p>
+  <ul>
+    <li>All three losses decrease smoothly, indicating stable training.</li>
+    <li>Validation curves closely follow the training curves, suggesting no serious overfitting.</li>
+    <li>Most of the improvement happens in the first 8--10 epochs; afterwards the model converges.</li>
+  </ul>
+
+  <h2 class="section-title">4. Detection Results on Validation Images</h2>
+
+  <p>
+    Five validation samples were tested. The following figures show predicted boxes in
+    <span class="red">red</span> and ground truth boxes in
+    <span class="green">green dashed</span>.
+  </p>
+
+  <div class="figure">
+    <img src="sample_images_1,2.png" alt="Validation samples 1 and 2" />
+    <div class="caption">
+      Validation samples 1 and 2: the model correctly detects bananas against different natural backgrounds.
+    </div>
+  </div>
+
+  <div class="figure">
+    <img src="sample_images_3,4.png" alt="Validation samples 3 and 4" />
+    <div class="caption">
+      Validation samples 3 and 4: robust detections even when the banana is smaller or close to textured regions (mountain, tree branches).
+    </div>
+  </div>
+
+  <div class="figure">
+    <img src="sample_images_5.png" alt="Validation sample 5" />
+    <div class="caption">
+      Validation sample 5: successful detection when the banana is near another object (animal) with a cluttered background.
+    </div>
+  </div>
+
+  <p><span class="bold">Overall observation:</span><br />
+  The model learns to detect bananas with high confidence across a variety of backgrounds, scales, and scenes.</p>
+
+  <h2 class="section-title">5. Testing on My Own Banana Images</h2>
+
+  <p>
+    I also evaluated the model on several real-world banana images (not part of the training set) to check how well it generalizes outside the D2L dataset.
+  </p>
+
+  <h3>5.1 Successful Detections</h3>
+
+  <div class="figure">
+    <img src="Success_1.png" alt="Successful detection 1: a single banana on a dark background." />
+    <div class="caption">
+      Successful detection 1: a single banana on a dark background.
+    </div>
+  </div>
+
+  <div class="figure">
+    <img src="Success_2.png" alt="Successful detection 2: bananas in a fruit basket with other fruits." />
+    <div class="caption">
+      Successful detection 2: bananas in a fruit basket with other fruits.
+    </div>
+  </div>
+
+  <p class="bold">Why these detections are successful:</p>
+  <ul>
+    <li>In <span class="bold">Success 1</span>, the banana occupies a large portion of the image and the background is simple, so the bounding box is tight and the confidence score is high.</li>
+    <li>In <span class="bold">Success 2</span>, the banana is surrounded by other fruits, but its shape, color and approximate aspect ratio are very similar to the training images, so the detector still finds it with a reasonable confidence score.</li>
+  </ul>
+
+  <h3>5.2 Failure Cases</h3>
+
+  <div class="figure">
+    <img src="Failure_case_1.png" alt="Failure case 1: fruit basket with many objects; the model misses the bananas." />
+    <div class="caption">
+      Failure case 1: fruit basket with many objects; the model misses the bananas.
+    </div>
+  </div>
+
+  <div class="figure">
+    <img src="Failure_case_2.png" alt="Failure case 2: bananas with stickers and cluttered kitchen background." />
+    <div class="caption">
+      Failure case 2: bananas with stickers and cluttered kitchen background.
+    </div>
+  </div>
+
+  <div class="figure">
+    <img src="Failure_case_3.png" alt="Failure case 3: peeled banana in an unusual pose." />
+    <div class="caption">
+      Failure case 3: peeled banana in an unusual pose.
+    </div>
+  </div>
+
+  <p class="bold">Analysis of failure cases:</p>
+  <ul>
+    <li><span class="bold">Failure case 1:</span> the scene contains many bright fruits with similar colors and shapes. The bananas are partially occluded and do not match the simple banana appearances in the training set, so the detector gives low confidence and does not fire.</li>
+    <li><span class="bold">Failure case 2:</span> the bananas have stickers and sit in a busy kitchen environment. The detector sometimes focuses on only part of the banana or gets confused by the sticker texture.</li>
+    <li><span class="bold">Failure case 3:</span> the peeled banana shape is very different from the intact bananas used for training. Since the model never saw this pose, it fails to recognize it as a banana.</li>
+  </ul>
+
+  <p>
+    These examples show that the model generalizes reasonably well, but struggles with strong occlusion, heavy clutter, and shapes that are far from the training distribution.
+  </p>
+
+  <h2 class="section-title">6. Conclusion</h2>
+
+  <p>
+    This part of the project demonstrates the implementation of a lightweight SSD model for object detection. The model trains stably, achieves good performance on the validation set, and generalizes moderately well to real-world images.
+  </p>
+
+  <p>The failure cases indicate possible improvements:</p>
+  <ul>
+    <li>Augment the training data with more diverse scenes (occlusion, clutter, peeled bananas).</li>
+    <li>Use additional feature maps to better handle very small objects.</li>
+    <li>Experiment with lower confidence thresholds or soft-NMS to recover borderline detections.</li>
+  </ul>
+
+  <p>
+    Overall, Part 1 helped me understand the full pipeline of SSD-style detectors: dataset preparation, anchor generation, loss design, training behavior, and qualitative evaluation on both benchmark and custom images.
+  </p>
+
+    <!-- ======================= -->
+  <!-- Part 2: NMS (append below Part 1) -->
+  <!-- ======================= -->
+  <!-- Add id="part2" so navbar can jump here -->
+  <h2 class="section-title" id="part2">Part 2: Non-Maximum Suppression (NMS)</h2>
+
+  <p>
+    Non-Maximum Suppression (NMS) is a critical post-processing step in object detection. 
+    Although the SSD model produces a large number of anchor-based predictions, many of 
+    these bounding boxes overlap heavily and correspond to the same object. NMS reduces 
+    this redundancy by selecting only the most confident bounding box while suppressing 
+    the others based on their Intersection-over-Union (IoU) overlap.
+  </p>
+
+  <p>
+    In this part, we implemented a custom NMS function from scratch and compared its 
+    results with the official <code>torchvision.ops.nms</code> implementation. All 
+    experiments were conducted on validation images from the banana detection dataset 
+    trained in Part&nbsp;1.
+  </p>
+
+  <h3>1. Raw SSD Predictions (Before NMS)</h3>
+
+  <p>
+    Figure&nbsp;1 shows the output of the SSD model before applying NMS. 
+    Although the detector identifies the banana, it produces many overlapping bounding 
+    boxes around the same object, each with different confidence scores. This behavior 
+    is expected because SSD evaluates thousands of anchors per image.
+  </p>
+
+  <div class="figure">
+    <img src="before_nms.png" alt="Raw SSD predictions before applying NMS." />
+    <div class="caption">
+      Raw SSD predictions before applying NMS. Multiple overlapping boxes are produced around the same object.
+    </div>
+  </div>
+
+  <h3>2. Output After Custom NMS</h3>
+
+  <p>
+    Our custom NMS implementation sorts boxes by confidence score, selects the highest 
+    scoring box, computes IoU with all remaining boxes, and discards boxes with overlap 
+    greater than a threshold (IoU = 0.5). Figure&nbsp;2 shows the cleaned 
+    prediction: only a single high-confidence bounding box is retained. This confirms 
+    that our NMS implementation is functioning correctly.
+  </p>
+
+  <div class="figure">
+    <img src="after_my_nms.png" alt="Detection results after applying the custom NMS (IoU threshold = 0.5)." />
+    <div class="caption">
+      Detection results after applying the custom NMS (IoU threshold = 0.5). Only one bounding box remains.
+    </div>
+  </div>
+
+  <h3>3. Comparison With PyTorch NMS</h3>
+
+  <p>
+    We also applied PyTorch’s built-in NMS to the same predictions. As shown in 
+    Figure&nbsp;3, the result is identical to our implementation. The 
+    indices selected by both methods match exactly:
+  </p>
+
+  <pre>
+My NMS indices:          tensor([14])
+Torchvision NMS indices: tensor([14])
+Same set of indices?     True
+  </pre>
+
+  <p>
+    This confirms that our implementation is correct and adheres to the standard NMS algorithm.
+  </p>
+
+  <div class="figure">
+    <img src="after_torch_nms.png" alt="Detection results using torchvision.ops.nms." />
+    <div class="caption">
+      Detection results using <code>torchvision.ops.nms</code>. The output matches the custom NMS implementation.
+    </div>
+  </div>
+
+  <h3>4. IoU Threshold Analysis</h3>
+
+  <p>
+    To understand the effect of the IoU threshold, we evaluated our NMS at different 
+    thresholds (0.3, 0.5, 0.7). For the tested validation image, all settings retained 
+    a single bounding box:
+  </p>
+
+  <pre>
+IoU threshold = 0.3: kept 1 boxes out of 39
+IoU threshold = 0.5: kept 1 boxes out of 39
+IoU threshold = 0.7: kept 1 boxes out of 39
+  </pre>
+
+  <p>
+    Since only one strong detection was present, lower or higher suppression strength 
+    did not change the final result. However, in images with multiple overlapping 
+    detections, the threshold plays a significant role in controlling how aggressively 
+    boxes are removed.
+  </p>
+
+  <h3>5. Discussion and Limitations of NMS</h3>
+
+  <ul>
+    <li>
+      <span class="bold">Purpose:</span> NMS reduces redundant detections and keeps only the most 
+      confident bounding box for each object.
+    </li>
+    <li>
+      <span class="bold">Effectiveness:</span> As shown in our experiments, it drastically cleans up 
+      raw predictions and produces accurate final detections.
+    </li>
+    <li>
+      <span class="bold">Comparison:</span> Our custom NMS matches the PyTorch implementation exactly, 
+      confirming correctness.
+    </li>
+    <li>
+      <span class="bold">Limitations:</span>
+      <ul>
+        <li>
+          If two objects are very close together, NMS may incorrectly suppress one 
+          of them.
+        </li>
+        <li>
+          NMS uses a hard threshold; it does not softly reduce scores (unlike Soft-NMS).
+        </li>
+        <li>
+          The result is highly sensitive to the IoU threshold (too low = over-suppression, 
+          too high = multiple duplicate boxes).
+        </li>
+      </ul>
+    </li>
+  </ul>
+
+  <p>
+    Overall, NMS is essential for producing clean and accurate object detections. This part 
+    successfully demonstrates the implementation, visualization, and evaluation of NMS in 
+    the SSD detection pipeline.
+  </p>
+
+  <h1 id="part3">Part 3: Human–Object Interaction (HOI) Analysis using VLMs</h1>
+
+<p>
+  In this final part of the project, the objective was to analyze how 
+  modern vision–language models (VLMs) perform at recognizing 
+  <strong>human–object interactions (HOI)</strong> in a 
+  <strong>zero-shot setting</strong>. 
+  Instead of training a model on HICO-DET, we queried a pretrained VLM 
+  (Google Gemini) and examined how well the model’s predictions align 
+  with HICO-DET ground-truth labels.
+</p>
+
+<p>The study covers:</p>
+<ul>
+  <li>zero-shot HOI prediction using Gemini,</li>
+  <li>comparison with HICO-DET ground truth,</li>
+  <li>failure modes,</li>
+  <li>effects of prompt refinement and in-context guidance.</li>
+</ul>
+
+<h2>3.1 Dataset and Setup</h2>
+
+<p>
+  We used the HuggingFace HICO-DET dataset (<code>zhimeng/hico_det</code>).  
+  Each sample contains:
+</p>
+
+<ul>
+  <li>RGB image,</li>
+  <li>a list of ground-truth HOI labels in <code>positive_captions</code>,</li>
+  <li>object/verb pairs (e.g., <code>('sports_ball','kick')</code>).</li>
+</ul>
+
+<p>Five images were selected for qualitative evaluation:</p>
+
+<ol>
+  <li>Truck scene (idx 9516) — <code>truck no_interaction</code></li>
+  <li>Soccer scene (idx 4844) — <code>sports_ball kick</code></li>
+  <li>Wine glass scene (idx 3493) — <code>wine_glass hold</code></li>
+  <li>Boat scene (idx 6306) — <code>boat ride/sit_on/stand_on</code></li>
+  <li>Cake cutting (idx 1312) — <code>cake cut</code></li>
+</ol>
+
+<p>
+  Ground-truth labels were normalized into the format <code>object verb</code>
+  (e.g., <code>sports_ball kick</code>).  
+  Gemini outputs of the form <code>&lt;verb object&gt;</code> were converted to the same 
+  format for strict matching.
+</p>
+
+<h2>3.2 Zero-shot Prompting</h2>
+
+<p>We used the following prompt:</p>
+
+<pre><code>You are an expert in human–object interaction (HOI) detection.
+List all interactions in the form &lt;verb object&gt;.
+Only include real interactions; do not guess.</code></pre>
+
+<p>
+  Gemini was never trained on HICO-DET, so all predictions are zero-shot.
+</p>
+
+<p>For each image we computed:</p>
+<ul>
+  <li>Correct HOIs,</li>
+  <li>Missed HOIs,</li>
+  <li>Extra HOIs (hallucinations).</li>
+</ul>
+
+<h2>3.3 Qualitative Results</h2>
+
+<p>
+  Below are the <strong>five real images</strong> used in this experiment, 
+  shown in the same order as in the LaTeX report.
+</p>
+
+<!-- FIGURE 1: Image_9516.png -->
+<div class="figure" id="fig-9516">
+  <img src="Image_9516.png" alt="Truck scene (Image 9516)" />
+  <p class="caption">
+    <strong>Figure 1.</strong> Truck scene (Image 9516). 
+    Ground truth: <code>truck no_interaction</code>.
+  </p>
+</div>
+
+<!-- FIGURE 2: Image_4844.png -->
+<div class="figure" id="fig-4844">
+  <img src="Image_4844.png" alt="Soccer scene (Image 4844)" />
+  <p class="caption">
+    <strong>Figure 2.</strong> Soccer scene (Image 4844). 
+    Ground truth: <code>sports_ball kick</code>.
+  </p>
+</div>
+
+<!-- FIGURE 3: Image_3493.png -->
+<div class="figure" id="fig-3493">
+  <img src="Image_3493.png" alt="Person holding a wine glass (Image 3493)" />
+  <p class="caption">
+    <strong>Figure 3.</strong> Person holding a wine glass (Image 3493). 
+    Ground truth: <code>wine_glass hold</code>.
+  </p>
+</div>
+
+<!-- FIGURE 4: Image_6306.png -->
+<div class="figure" id="fig-6306">
+  <img src="Image_6306.png" alt="Boat scene (Image 6306)" />
+  <p class="caption">
+    <strong>Figure 4.</strong> Boat scene (Image 6306). 
+    Ground truth: <code>boat ride</code>, <code>boat sit_on</code>, 
+    <code>boat stand_on</code>.
+  </p>
+</div>
+
+<!-- FIGURE 5: Image_1312.png -->
+<div class="figure" id="fig-1312">
+  <img src="Image_1312.png" alt="Cake cutting scene (Image 1312)" />
+  <p class="caption">
+    <strong>Figure 5.</strong> Cake cutting scene (Image 1312). 
+    Ground truth: <code>cake cut</code>.
+  </p>
+</div>
+
+<h3>Summary of Zero-shot Outputs</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Image</th>
+      <th>GT HOIs</th>
+      <th>Gemini predictions</th>
+      <th>Outcome</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>9516 (Truck)</td>
+      <td><code>truck no_interaction</code></td>
+      <td>
+        wear shirt, wear pants, hold marker, touch table
+      </td>
+      <td>
+        Missed truck interaction completely. Hallucinated clothing HOIs.
+      </td>
+    </tr>
+    <tr>
+      <td>4844 (Soccer)</td>
+      <td><code>sports_ball kick</code></td>
+      <td>
+        kick ball, wear shirt, wear socks
+      </td>
+      <td>
+        Correct semantics but mismatch: <code>ball</code> vs <code>sports_ball</code>.
+      </td>
+    </tr>
+    <tr>
+      <td>3493 (Wine glass)</td>
+      <td><code>wine_glass hold</code></td>
+      <td>
+        hold glass, wear shirt
+      </td>
+      <td>
+        Correct meaning but object name mismatch.
+      </td>
+    </tr>
+    <tr>
+      <td>6306 (Boat)</td>
+      <td>ride/sit_on/stand_on boat</td>
+      <td>
+        sit_on boat, sit_on motorcycle, wear jacket
+      </td>
+      <td>
+        Partially correct. Extra motorcycle and clothing HOIs.
+      </td>
+    </tr>
+    <tr>
+      <td>1312 (Cake)</td>
+      <td><code>cake cut</code></td>
+      <td>
+        cut cake, hold knife, wear shirt
+      </td>
+      <td>
+        Correct HOI but additional extra interactions.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>3.4 Failure Analysis</h2>
+
+<p>Two major failure modes were observed:</p>
+
+<h3>(1) Ontology Mismatch</h3>
+<ul>
+  <li>Gemini uses everyday words (<code>ball</code>, <code>glass</code>).</li>
+  <li>HICO-DET uses dataset-specific names (<code>sports_ball</code>, <code>wine_glass</code>).</li>
+</ul>
+
+<h3>(2) Clothing Hallucinations</h3>
+<p>Gemini frequently outputs:</p>
+<ul>
+  <li><code>&lt;wear shirt&gt;</code></li>
+  <li><code>&lt;wear pants&gt;</code></li>
+  <li><code>&lt;wear hat&gt;</code></li>
+</ul>
+<p>
+  These are natural-language observations but <strong>not part of the HOI ontology</strong>.
+</p>
+
+<h3>(3) Difficulty with Negative HOIs</h3>
+<p>Especially for the label:</p>
+<p><code>truck no_interaction</code></p>
+<p>
+  VLMs struggle because it requires detecting <strong>absence</strong> of interaction.
+</p>
+
+<h2>3.5 Prompt Refinement Experiments</h2>
+
+<p>We refined the prompt by adding:</p>
+
+<ul>
+  <li>Allowed verbs list: <code>hold</code>, <code>ride</code>, <code>kick</code>, <code>sit_on</code>, <code>stand_on</code>, <code>cut</code>, <code>no_interaction</code></li>
+  <li>Object list per image (e.g., truck, boat, cake)</li>
+  <li>Three in-context examples</li>
+</ul>
+
+<p><strong>Improvements:</strong></p>
+<ul>
+  <li>Better predictions on soccer and cake scenes.</li>
+  <li>More consistent boat predictions.</li>
+</ul>
+
+<p><strong>Not fixed:</strong></p>
+<ul>
+  <li>“no interaction” truck case.</li>
+  <li>Clothing hallucinations still appear.</li>
+</ul>
+
+<h2>3.6 Discussion</h2>
+
+<p>
+  Zero-shot VLMs show strong semantic reasoning:
+  “kick ball”, “cut cake”, “hold glass”.
+</p>
+
+<p>But they fail to align with a rigid dataset like HICO-DET due to:</p>
+<ul>
+  <li>ontology mismatch,</li>
+  <li>extra hallucinated interactions,</li>
+  <li>difficulty with negation-based labels,</li>
+  <li>absence of supervision on HOI taxonomy.</li>
+</ul>
+
+<p>
+  Thus, while VLMs capture the <em>meaning</em> of HOIs very well, 
+  they cannot replace specialized HOI detectors without fine-tuning 
+  or mapping between vocabularies.
+</p>
+
+
+</body>
+</html>
 
