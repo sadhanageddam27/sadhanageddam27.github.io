@@ -121,6 +121,146 @@ Overall, Part 1 clearly demonstrates how diffusion models remove noise more effe
 classical filtering approaches, and how iterative denoising significantly improves reconstruction 
 quality compared to one-step methods.
 </p>
+<hr><br>
+
+<h1>Part 2: Understanding the Forward and Reverse Processes</h1>
+
+<p>
+In Part 2, we moved beyond simple denoising and explored how diffusion models can be used for 
+<i>generation, guidance-based sampling, and image-to-image translation</i>.  
+All experiments used the same pretrained DeepFloyd IF Stage 1 UNet, and the same scheduler and prompt 
+embeddings that were prepared earlier in the notebook.
+</p>
+
+<!-- --------------------------------------------------------------- -->
+<h2>2.1 Diffusion Model Sampling (Image Generation from Noise)</h2>
+
+<p>
+The goal of this section was to generate images <b>from pure Gaussian noise</b>, using the
+<code>iterative_denoise</code> function developed in Part 1.4.  
+By setting <code>i_start = 0</code>, we begin the reverse diffusion chain from the noisiest timestep and 
+let the model gradually push the noise back onto the natural image manifold.  
+The prompt used for all samples was <code>"a high quality photo"</code>.
+</p>
+
+<p>
+The important observation here is that the model is forced to hallucinate an image entirely from 
+its learned distribution; therefore, the results tend to be blurry or low-detail when no guidance 
+mechanism is used. This is expected because the reverse process is running without any additional 
+constraints and relies purely on the denoiser's learned prior.
+</p>
+
+<figure>
+    <img src="2.1_one.png" alt="2.1 generative noise samples" style="max-width:85%;">
+    <figcaption>Five images generated from pure noise using iterative denoising.</figcaption>
+</figure>
+
+<!-- --------------------------------------------------------------- -->
+<h2>2.2 Classifier-Free Guidance (CFG)</h2>
+
+<p>
+To improve the quality of the generated images, we implemented  
+<b>Classifier-Free Guidance (CFG)</b>.  
+The key idea is to combine two noise predictions from the UNet:
+</p>
+
+<ul>
+    <li>a <em>conditional</em> noise estimate (ε<sub>c</sub>) using the text prompt,</li>
+    <li>an <em>unconditional</em> noise estimate (ε<sub>u</sub>) using an empty prompt,</li>
+</ul>
+
+<p>
+and interpolate them using the CFG scale γ:
+</p>
+
+<p style="text-align:center; font-size:18px;">
+ε = ε<sub>u</sub> + γ (ε<sub>c</sub> − ε<sub>u</sub>)
+</p>
+
+<p>
+We used <b>γ = 7</b>, which typically strengthens the conditioning signal.<br>
+Compared to Part 2.1, the images produced here were more structured, had smoother color transitions, 
+and looked less like random noise.  
+Although the model still produced abstract results due to limited training resolution,
+there was a clear improvement over unguided sampling.
+</p>
+
+<figure>
+    <img src="2.2_one.png" alt="CFG results" style="max-width:85%;">
+    <figcaption>Five CFG-guided samples using γ = 7. Noticeably sharper and more structured than unguided samples.</figcaption>
+</figure>
+
+<!-- --------------------------------------------------------------- -->
+<h2>2.3 Image-to-Image Translation (SDEdit)</h2>
+
+<p>
+In this section, we applied the diffusion model to perform <b>image-to-image translation</b>, 
+inspired by the SDEdit algorithm.  
+The idea is:
+</p>
+
+<ul>
+    <li>Start from a real image x₀.</li>
+    <li>Add forward-process noise at a chosen timestep t.</li>
+    <li>Use reverse diffusion (with CFG) to project the noisy image back to the natural image manifold.</li>
+</ul>
+
+<p>
+By changing the starting timestep t (equivalently the <code>i_start</code> index),  
+we control how much “creativity” or modification the model introduces:
+</p>
+
+<ul>
+    <li><b>Small noise</b> → output remains close to the original.</li>
+    <li><b>Moderate noise</b> → model begins altering colors/shapes.</li>
+    <li><b>Large noise</b> → model produces entirely new interpretations while keeping global structure.</li>
+</ul>
+
+<p>
+We performed this experiment on:
+</p>
+
+<ol>
+    <li>the provided test tower image,</li>
+    <li>a flower image (own image),</li>
+    <li>a cat image (own image).</li>
+</ol>
+
+<p>
+Across all three cases, we observed a consistent pattern: increasing <code>i_start</code> causes the model to 
+inject more “creative freedom,” gradually morphing the original picture while still keeping 
+the overall scene composition (e.g., background layout, shapes, or silhouettes).
+</p>
+
+<!-- Flower results -->
+<figure>
+    <img src="2.3_one.png" alt="Flower SDEdit" style="max-width:75%;"><br><br>
+    <img src="2.3_two.png" alt="Flower SDEdit more" style="max-width:75%;">
+    <figcaption>SDEdit results on the flower image. Larger i_start values produce more creative, stylized outputs.</figcaption>
+</figure>
+
+<!-- Cat results -->
+<figure>
+    <img src="2.3_three.png" alt="Cat SDEdit" style="max-width:75%;"><br><br>
+    <img src="2.3_four.png" alt="Cat SDEdit more" style="max-width:75%;">
+    <figcaption>SDEdit results on the cat image. Noise controls the level of abstraction and reconstruction.</figcaption>
+</figure>
+
+<!-- Tower results -->
+<figure>
+    <img src="2.3_five.png" alt="Tower SDEdit" style="max-width:75%;"><br><br>
+    <img src="2.3_six.png" alt="Tower SDEdit more" style="max-width:75%;">
+    <figcaption>SDEdit results on the tower image. Higher noise causes stronger reinterpretation while preserving scene layout.</figcaption>
+</figure>
+
+<p>
+Overall, SDEdit demonstrates the flexibility of diffusion models in transforming images while 
+preserving global structure. Even with low-resolution UNet models, the transition from light edits 
+to heavy reinterpretation is clearly visible as the noise level increases.
+</p>
+
+<br><hr><br>
+
 
 </body>
 </html>
