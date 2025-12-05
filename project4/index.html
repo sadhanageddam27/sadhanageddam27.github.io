@@ -261,6 +261,141 @@ to heavy reinterpretation is clearly visible as the noise level increases.
 
 <br><hr><br>
 
+<hr><br>
+
+<h1>Part 3: Visual Anagrams</h1>
+
+<p>
+In this part of the project, I implemented <b>Visual Anagrams</b> using the DeepFloyd IF diffusion model.
+The goal of this section is to create a single diffusion image that shows one concept when it is viewed normally,
+and a completely different concept when the image is flipped upside down.
+This was one of the most interesting parts of the assignment because it requires controlling the generative model
+during sampling, not after.
+</p>
+
+<h2>Approach</h2>
+
+<p>For each image, I used two different text prompts:</p>
+
+<ul>
+    <li>one prompt for the <b>upright view</b></li>
+    <li>one prompt for the <b>flipped view</b></li>
+</ul>
+
+<p>
+During generation, I produced two noise predictions at every denoising step:
+one from the upright prompt and one from the flipped prompt.
+The flipped prediction was created by rotating the latent representation by 180 degrees.
+By blending both noise predictions, the final image slowly forms a hidden structure that changes when the orientation is reversed.
+</p>
+
+<p>
+Since the base model only generates 64×64 images, the results appear more abstract and blurry, which is expected.
+To improve clarity, I also used the Stage-2 upsampling model to convert selected images to 256×256 resolution.
+</p>
+
+<p>The assignment requires:</p>
+
+<ul>
+    <li>a correct implementation of the visual anagram sampling procedure,</li>
+    <li>one illusion of “campfire upright → old man when flipped,”</li>
+    <li>two more illusions of our choice,</li>
+    <li>example images showing upright vs. flipped behavior.</li>
+</ul>
+
+<p>
+I generated three illusions total:
+</p>
+
+<ol>
+    <li>Campfire → Old Man</li>
+    <li>Waterfalls → Skull</li>
+    <li>Dog → Man</li>
+</ol>
+
+<p>
+For each illusion, I generated two 64×64 outputs using different seeds (six total).
+Then I upsampled one output from each category to 256×256.
+</p>
+
+
+<h2>64×64 Visual Anagrams</h2>
+
+<figure>
+    <img src="fig_1.png" style="max-width:75%;">
+    <figcaption>64×64 Visual Anagram — Campfire (upright) vs. Old Man (flipped).</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_2.png" style="max-width:75%;">
+    <figcaption>Second seed — Campfire (upright) vs. Old Man (flipped).</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_3.png" style="max-width:75%;">
+    <figcaption>64×64 Visual Anagram — Waterfalls (upright) vs. Skull (flipped).</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_4.png" style="max-width:75%;">
+    <figcaption>Second seed — Waterfalls (upright) vs. Skull (flipped).</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_5.png" style="max-width:75%;">
+    <figcaption>Second seed — Dog (upright) vs. Man (flipped).</figcaption>
+</figure>
+
+
+<h2>Observations</h2>
+
+<p>Across all results, I observed that:</p>
+
+<ul>
+    <li>The upright and flipped views genuinely produce different shapes and textures.</li>
+    <li>Even though the images are abstract, the overall silhouette changes noticeably.</li>
+    <li>Waterfall/skull and dog/man illusions were especially clear because the geometry differed strongly.</li>
+    <li>The campfire/old man illusion produced softer shapes, but facial-like edges appeared when flipped.</li>
+    <li>The 256×256 upsampled images look cleaner and smoother, although still abstract due to the 64×64 base model.</li>
+</ul>
+
+<p>
+Overall, visual anagrams work surprisingly well even with a small model, and flipping the image
+produces a clear semantic shift in every case.
+</p>
+
+
+<h2>256×256 Upsampled Visual Anagrams (Three Images)</h2>
+
+<figure>
+    <img src="fig_6.png" style="max-width:75%;">
+    <figcaption>256×256 Upsampled Visual Anagram — Campfire vs. Old Man.</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_7.png" style="max-width:75%;">
+    <figcaption>256×256 Upsampled Visual Anagram — Waterfalls vs. Skull.</figcaption>
+</figure>
+
+<figure>
+    <img src="fig_8.png" style="max-width:75%;">
+    <figcaption>256×256 Upsampled Visual Anagram — Dog vs. Man.</figcaption>
+</figure>
+
+
+<h2>Conclusion</h2>
+
+<p>
+This part of the project successfully demonstrates how diffusion models can be manipulated to embed
+two different interpretations into a single generated image.
+Even though the model generates low-resolution outputs, the upright and flipped views consistently
+show different semantic structures.
+This experiment highlights the flexibility of diffusion models and shows how prompt guidance and
+geometric transformations can be combined to produce creative and surprising generative effects.
+</p>
+
+<br><hr><br>
+
 
 </body>
 </html>
